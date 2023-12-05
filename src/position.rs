@@ -61,15 +61,16 @@ impl<'a> Widget for PositionWidget<'a> {
         let end = position_area.left() + filled_width.floor() as u16;
         for y in position_area.top()..position_area.bottom() {
             for x in position_area.left()..end {
-                buf.get_mut(x, y).set_symbol("─"); //;*/ ("━");
+                buf.get_mut(x, y).set_symbol("━")
+                    .set_fg(Color::Rgb(211, 189, 151)); //;*/ ("━");
             }
             if self.ratio < 1.0 {
                 buf.get_mut(end, y)
-                    .set_symbol(get_unicode(filled_width % 1.0));
+                    .set_symbol("━");//get_unicode(filled_width % 1.0));
 
                 for x in (end + 1)..position_area.right() {
                     buf.get_mut(x, y)
-                        .set_symbol(" ")
+                        .set_symbol("━")//"─")
                         .set_fg(self.style.fg.unwrap_or(Color::White))
                         .set_bg(self.style.bg.unwrap_or(Color::Black));
                 }
@@ -80,7 +81,7 @@ impl<'a> Widget for PositionWidget<'a> {
 
 fn get_unicode<'a>(frac: f64) -> &'a str {
     match (frac * 2.0).floor() as u16 {
-        0 => "╸", //"╾",
+        0 => /*"╸", */"╾",
         1 => "╼", //"━",
         _ => " ",
     }

@@ -1,0 +1,10 @@
+/home/rufus/Documents/unathplayer/target/debug/deps/rustc_serialize-cacac21817622f04.rmeta: /home/rufus/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rustc-serialize-0.3.24/src/lib.rs /home/rufus/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rustc-serialize-0.3.24/src/serialize.rs /home/rufus/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rustc-serialize-0.3.24/src/collection_impls.rs /home/rufus/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rustc-serialize-0.3.24/src/base64.rs /home/rufus/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rustc-serialize-0.3.24/src/hex.rs /home/rufus/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rustc-serialize-0.3.24/src/json.rs
+
+/home/rufus/Documents/unathplayer/target/debug/deps/rustc_serialize-cacac21817622f04.d: /home/rufus/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rustc-serialize-0.3.24/src/lib.rs /home/rufus/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rustc-serialize-0.3.24/src/serialize.rs /home/rufus/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rustc-serialize-0.3.24/src/collection_impls.rs /home/rufus/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rustc-serialize-0.3.24/src/base64.rs /home/rufus/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rustc-serialize-0.3.24/src/hex.rs /home/rufus/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rustc-serialize-0.3.24/src/json.rs
+
+/home/rufus/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rustc-serialize-0.3.24/src/lib.rs:
+/home/rufus/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rustc-serialize-0.3.24/src/serialize.rs:
+/home/rufus/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rustc-serialize-0.3.24/src/collection_impls.rs:
+/home/rufus/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rustc-serialize-0.3.24/src/base64.rs:
+/home/rufus/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rustc-serialize-0.3.24/src/hex.rs:
+/home/rufus/.cargo/registry/src/index.crates.io-6f17d22bba15001f/rustc-serialize-0.3.24/src/json.rs:

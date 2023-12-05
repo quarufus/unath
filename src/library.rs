@@ -5,11 +5,14 @@ use tui::{
     text::{Spans, Text},
     widgets::{Block, StatefulWidget, Widget},
 };
+use std::str::FromStr;
+use std::num::ParseIntError;
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct LibState {
     offset: usize,
     selected: Option<usize>,
+    playing: Option<usize>,
 }
 
 impl Default for LibState {
@@ -17,6 +20,7 @@ impl Default for LibState {
         LibState {
             offset: 0,
             selected: Some(0),
+            playing: None,
         }
     }
 }
@@ -26,11 +30,19 @@ impl LibState {
         self.selected
     }
 
+    pub fn playing(&self) -> Option<usize> {
+        self.playing
+    }
+
     pub fn select(&mut self, index: Option<usize>) {
         self.selected = index;
         if index.is_none() {
             self.offset = 0;
         }
+    }
+
+    pub fn set_playing(&mut self, index: Option<usize>) {
+        self.playing = index
     }
 
     pub fn offset(&mut self, index: usize) {
@@ -43,8 +55,10 @@ pub enum LibKind {
     Artist,
     Album,
     Title,
+    Playlist,
     Back,
-    All,
+    Home,
+    Option,
     None,
 }
 
@@ -63,6 +77,26 @@ pub struct LibItem {
     pub tag: LibKind,
 }
 
+impl FromStr for LibItem {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(LibItem {
+            content: s.into(),
+            style: Style::default(),
+            tag: LibKind::None,
+        })
+    }
+}
+
+/*impl Iterator for LibItem {
+    type item = usize;
+
+    fn next(&mut self) -> Option<Self::item> {
+        self.count += 1;
+
+        if self*/
+
 impl LibItem {
     pub fn new(content: String, tag: LibKind) -> LibItem {
         LibItem {
@@ -70,6 +104,10 @@ impl LibItem {
             style: Style::default(),
             tag,
         }
+    }
+
+    pub fn change_tag(&mut self, tag: LibKind) {
+        self.tag = tag
     }
 }
 
@@ -79,6 +117,8 @@ pub struct Tree<'a> {
     style: Style,
     highlight_style: Style,
     highlight_symbol: Option<&'a str>,
+    playing_style: Style,
+    playing_symbol: Option<&'a str>,
 }
 
 impl<'a> Tree<'a> {
@@ -92,6 +132,8 @@ impl<'a> Tree<'a> {
             items: &items.into(),
             highlight_style: Style::default(),
             highlight_symbol: None,
+            playing_style: Style::default(),
+            playing_symbol: None,
         }
     }
 
@@ -112,6 +154,16 @@ impl<'a> Tree<'a> {
 
     pub fn highlight_style(mut self, style: Style) -> Tree<'a> {
         self.highlight_style = style;
+        self
+    }
+
+    pub fn playing_style(mut self, style:Style) -> Tree<'a> {
+        self.playing_style = style;
+        self
+    }
+
+    pub fn playing_symbol(mut self, symbol: &'a str) -> Tree<'a> {
+        self.playing_symbol = Some(symbol);
         self
     }
 
@@ -206,17 +258,24 @@ impl<'a> StatefulWidget for Tree<'a> {
             buf.set_style(area, item_style);
 
             let is_selected = state.selected.map(|s| s == i).unwrap_or(false);
+            let is_playing = state.playing.map(|s| s == i).unwrap_or(false);
 
-            let symbol = match item.tag {
-                LibKind::Artist => String::from("  "),
-                LibKind::Album => String::from("    "),
-                LibKind::Title => String::from("     "),
+            let isymbol = match item.tag {
+                LibKind::Artist => String::from(" 󰀉  "),
+                LibKind::Album => String::from(" 󰀥  "),
+                LibKind::Title => String::from(" 󰎆  "),
+                LibKind::Home => String::from(" "),
                 LibKind::None => String::from(" "),
                 _ => String::from(""),
             };
             let (elem_x, max_element_width) = if has_selection {
+                let symbol = if is_playing {
+                    self.playing_symbol.unwrap_or("   ")
+                } else {
+                    &isymbol
+                };
                 let (elem_x, _) =
-                    buf.set_stringn(x, y, &symbol, list_area.width as usize, item_style);
+                        buf.set_stringn(x, y, &symbol, list_area.width as usize, item_style);
                 (elem_x, (list_area.width - (elem_x - x)) as u16)
             } else {
                 (x, list_area.width)
@@ -228,13 +287,16 @@ impl<'a> StatefulWidget for Tree<'a> {
                 max_element_width as u16,
             );
             let rect = Rect::new(
-                symbol.chars().count() as u16,
+                x,//isymbol.chars().count() as u16,
                 y,
-                list_area.width - symbol.chars().count() as u16,
+                list_area.width,// - isymbol.chars().count() as u16,
                 1,
             );
             if is_selected {
                 buf.set_style(rect, self.highlight_style);
+            }
+            if is_playing {
+                buf.set_style(rect, self.playing_style);
             }
         }
     }

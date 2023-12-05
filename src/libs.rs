@@ -1,11 +1,13 @@
 use crate::library::{LibItem, LibKind, LibState};
-use mpd::{song::QueuePlace, song::Song, status::Status, Query, Term};
-use std::borrow::Cow::Borrowed;
+use mpd::{client::Client,song::QueuePlace, song::Song, status::Status, Query, Term};
+use std::{borrow::Cow::Borrowed, io::Seek};
 use std::iter::FromIterator;
+use std::str::FromStr;
 use tui::{style::Color, style::Style, widgets::ListState};
 
 pub struct Data {
     pub library: Library,
+    pub sidelist: Vec<LibItem>,
     pub artists: Library,
     pub albums: Library,
     pub titles: Library,
@@ -14,10 +16,14 @@ pub struct Data {
     pub settings: Settings,
     pub status: Status,
     pub colors: ColorScheme,
+    pub drained: usize,
     pub tabindex: usize,
     pub current: mpd::song::Song,
     pub style: tui::style::Style,
     pub options: bool,
+    pub opts: Options,
+    pub path: Path,
+    pub side_path: Path,
 }
 
 impl<'a> Data {
@@ -36,42 +42,63 @@ impl<'a> Data {
         let mut queueitems: Vec<String> = vec![];
         let mut libraryitems = vec![];
         let mut playitems = vec![];
+        
+        let mut n_artists = 0;
+        let mut n_albums = 0;
+        let mut n_titles = 0;
+        let mut n_plylists = 0;
 
         for mut artists in artists.unwrap() {
             if artists.is_empty() {
-                artists = "[All Albums]".into()
+                artists = "-Uknown Artist-".into();
             }
             artistitems.push(artists.clone());
             libraryitems.push(artists);
+            n_artists += 1;
         }
-        //artistitems.remove(0);
         for albums in albums.unwrap() {
             albumitems.push(albums);
+            n_albums += 1;
         }
         albumitems.remove(0);
         for titles in titles.unwrap() {
             titleitems.push(titles);
+            n_titles += 1;
         }
-        titleitems.remove(0);
+        if titleitems.len() > 0 {titleitems.remove(0);}
         for queue in queue {
             let q = queue.title.unwrap_or("".into());
             queueitems.push(q);
         }
         for play in playlists {
             playitems.push(play.name);
+            n_plylists += 1;
         }
 
-        let library = Library::new(libraryitems, LibKind::Artist);
+        if n_titles > 999 {
+            n_titles /= 1000;
+        }
+
+        let library = Library::default();//new(libraryitems, LibKind::Artist);
         let artists = Library::new(artistitems, LibKind::Artist);
         let albums = Library::new(albumitems, LibKind::Album);
         let titles = Library::new(titleitems, LibKind::Title);
-        let queue = Library::new(queueitems, LibKind::None);
-        let playlists = Library::new(playitems, LibKind::None);
+        let queue = Library::new(queueitems, LibKind::Title);
+        let playlists = Library::new(playitems, LibKind::Playlist);
 
         let tabindex: usize = 0;
         let status = client.status().unwrap();
+        let mut path = Path::new();
+        path.update(artists.clone());
+        let sidelist = vec![
+            LibItem::new(n_plylists.to_string(), LibKind::None), 
+            LibItem::new(n_artists.to_string(), LibKind::None),
+            LibItem::new(n_albums.to_string(), LibKind::None),
+            LibItem::new(n_titles.to_string(), LibKind::None)];
+
         Data {
             library,
+            sidelist,
             artists,
             albums,
             titles,
@@ -81,9 +108,10 @@ impl<'a> Data {
             status,
             tabindex,
             colors: ColorScheme {
-                foreground: Color::White,
+                foreground: Color::Rgb(145, 130, 116),
                 background: Color::Black,
-                highlight: Color::Blue,
+                highlight: Color::Rgb(211, 189, 151),
+                selected: Color::Rgb(79, 76, 75),
             },
             current: match client.currentsong() {
                 Ok(song) => match song {
@@ -93,9 +121,13 @@ impl<'a> Data {
                 Err(_io) => Song::default(),
             },
             style: tui::style::Style::default()
-                .fg(Color::White)
-                .bg(Color::Black),
+                .fg(Color::Rgb(145, 131, 116))
+                .bg(Color::Rgb(40, 40, 40)),
             options: false,
+            opts: Options::new(),
+            drained: 0,
+            path,
+            side_path: Path::new(),
         }
     }
 
@@ -106,34 +138,51 @@ impl<'a> Data {
     }
 
     pub fn nexttab(&mut self) {
-        self.tabindex = (self.tabindex + 1) % 5;
+        self.tabindex = (self.tabindex + 1) % 4;
     }
 
     pub fn prevtab(&mut self) {
         match self.tabindex {
-            0 => self.tabindex = 4,
+            0 => self.tabindex = 3,
             _ => self.tabindex -= 1,
         }
     }
 
-    pub fn up(&mut self) {
+    pub fn up(&mut self, client: &mut Client) {
+        //let pos = client.status().unwrap().elapsed.unwrap().num_seconds();
+        if self.options {
+            self.opts.previous()
+        } else {
         match self.tabindex {
-            1 => self.library.previous(),
-            2 => self.albums.previous(),
-            3 => self.queue.previous(),
-            4 => self.settings.previous(),
+            0 => client.rewind(5).unwrap(),
+            1 => { self.library.previous(); self.path.update(self.library.clone()) },
+            2 => self.queue.previous(),
+            3 => self.settings.previous(),
             _ => {}
+        }
         }
     }
 
-    pub fn down(&mut self) {
+    pub fn down(&mut self, client: &mut Client) {
+        if self.options {
+            self.opts.next()
+        } else {
         match self.tabindex {
-            1 => self.library.next(),
-            2 => self.albums.next(),
-            3 => self.queue.next(),
-            4 => self.settings.next(),
+            0 => client.rewind(-5).unwrap(),
+            1 => { self.library.next(); self.path.update(self.library.clone()) },
+            2 => self.queue.next(),
+            3 => self.settings.next(),
             _ => {}
         }
+        }
+    }
+
+    pub fn index(&self) -> usize {
+        self.library.state.selected().unwrap_or(0)
+    }
+
+    pub fn selected(&self) -> LibItem {
+        self.library.items[self.index()].clone()
     }
 }
 
@@ -141,6 +190,7 @@ pub struct ColorScheme {
     pub foreground: Color,
     pub background: Color,
     pub highlight: Color,
+    pub selected: Color,
 }
 
 pub struct ArtistOptions {
@@ -150,7 +200,21 @@ pub struct ArtistOptions {
 #[derive(Clone)]
 pub struct Library {
     pub items: Vec<LibItem>,
+    pub sidelist: Vec<LibItem>,
     pub state: LibState,
+}
+
+impl Default for Library {
+    fn default() -> Self {
+        Library {
+            items: vec![LibItem::new("󰟄  Playlists".into(), LibKind::Home),
+                        LibItem::new("󰀉  Artists".into(), LibKind::Home),
+                        LibItem::new("󰀥  Albums".into(), LibKind::Home),
+                        LibItem::new("󰎆  Titles".into(), LibKind::Home)],
+            sidelist: vec![],
+            state: LibState::default(),
+        }
+    }
 }
 
 impl<'a> Library {
@@ -161,7 +225,12 @@ impl<'a> Library {
                 .iter()
                 .map(|i| LibItem::new(i.clone(), kind.clone()))
                 .collect(),
+            sidelist: vec![],
         }
+    }
+
+    pub fn push(&mut self, item: LibItem) {
+        self.items.push(item);
     }
 
     pub fn add_to_queue(&self, data: &Data, client: &mut mpd::Client) {
@@ -189,7 +258,7 @@ impl<'a> Library {
 
     pub fn select_last(&mut self) {
         let len = self.items.len();
-        if len > 0 && self.state.selected().unwrap() == len {
+        if len > 0 && self.state.selected().unwrap() > len {
             self.state.select(Some(len - 1));
             self.state.offset(0);
         }
@@ -199,21 +268,24 @@ impl<'a> Library {
         Library {
             state: LibState::default(),
             items,
+            sidelist: vec![],
         }
     }
 
     pub fn get_albums(&mut self, client: &mut mpd::Client) -> Library {
-        let idx: String = self.items[self.state.selected().unwrap()].content.clone();
+        let idx = self.items[self.state.selected().unwrap()].clone();
         let mut query = Query::new();
-
-        let name = idx.as_str();
-        let items = client.list(
+        
+        let items: Result<Vec<String>, mpd::error::Error>;
+        if idx.tag == LibKind::Home {
+            items = client.list(&Term::Tag(Borrowed("Album")), &query);
+        } else {
+            items = client.list(
             &Term::Tag("Album".into()),
-            &query.and(Term::Tag("Artist".into()), Borrowed(name)),
-        );
+            &query.and(Term::Tag("Artist".into()), Borrowed(idx.content.as_str())),
+        );}
         let mut artistalbums: Vec<String> = vec![];
         for albums in items.unwrap() {
-            //albums.insert_str(0, "");
             artistalbums.push(albums);
         }
 
@@ -222,14 +294,12 @@ impl<'a> Library {
 
     pub fn get_titles(&mut self, client: &mut mpd::Client) -> Library {
         let idx: String = self.items[self.state.selected().unwrap()].content.clone();
-        let artist = self.items[1].content.clone();
 
         let name: &str = idx.as_str();
 
         let mut query = Query::new();
         let query = query
-            .and(Term::Tag("Album".into()), Borrowed(name))
-            .and(Term::Tag("Artist".into()), artist);
+            .and(Term::Tag("Album".into()), Borrowed(name));
         let mut items = client.search(&query, None).unwrap();
         items.sort_by_key(|song| {
             song.tags
@@ -297,10 +367,67 @@ impl FromIterator<LibItem> for Library {
     }
 }
 
+pub struct Path {
+    artists: Option<Library>,
+    albums: Option<Library>,
+    titles: Option<Library>,
+    home: Library,
+}
+
+impl Path {
+    pub fn new() -> Path {
+        Path {
+            artists: None,
+            albums: None,
+            titles: None,
+            home: Library::default(),
+        }
+    }
+
+    pub fn update(&mut self, level: Library) {
+        match level.items[0].tag {
+            LibKind::Artist => self.artists = Some(level),
+            LibKind::Album => self.albums = Some(level),
+            LibKind::Title => self.titles = Some(level),
+            LibKind::Home => self.home = level,
+            _ => {},
+        }
+    }
+
+    pub fn up(&mut self) -> Library {
+        let mut out = Some(self.home.clone());
+        match &self.titles {
+            Some(_) => { out = self.albums.clone(); self.titles = None; },
+            None => match &self.albums {
+                Some(_) => { out = self.artists.clone(); self.albums = None; },
+                None => match &self.artists {
+                    Some(_) => { out = Some(self.home.clone()); self.artists = None; },
+                    None => {},
+                }
+            }
+        }
+        match out {
+            Some(o) => o,
+            None => self.home.clone(),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct Artists {
     pub items: Vec<LibItem>,
     pub state: LibState,
     pub options: Vec<String>,
+}
+
+impl From<Library> for Artists {
+    fn from(l: Library) -> Artists {
+        Artists {
+            items: l.items,
+            state: l.state,
+            options: vec![],
+        }
+    }
 }
 
 impl<'a> Artists {
@@ -379,15 +506,25 @@ impl<'a> Artists {
     }
 }
 
+#[derive(Clone)]
 pub struct Albums {
     pub items: Vec<LibItem>,
-    pub state: ListState,
+    pub state: LibState,
+}
+
+impl From<Library> for Albums {
+    fn from(l: Library) -> Albums {
+        Albums {
+            items: l.items,
+            state: l.state,
+        }
+    }
 }
 
 impl<'a> Albums {
     pub fn new(items: Vec<String>) -> Albums {
         Albums {
-            state: ListState::default(),
+            state: LibState::default(),
             items: items
                 .iter()
                 .map(|i| LibItem::new(i.clone(), LibKind::Album))
@@ -461,15 +598,33 @@ impl<'a> Albums {
     }
 }
 
+#[derive(Clone)]
 pub struct Titles {
     pub items: Vec<LibItem>,
-    pub state: ListState,
+    pub state: LibState,
 }
+
+impl From<Library> for Titles {
+    fn from(l: Library) -> Titles {
+        Titles {
+            items: l.items,
+            state: l.state,
+        }
+    }
+}
+
+//impl Copy for Titles {}
+
+//impl Clone for Titles {
+//    fn clone(&self) -> Self {
+//        *self
+//    }
+//}
 
 impl<'a> Titles {
     pub fn new(items: Vec<String>) -> Titles {
         Titles {
-            state: ListState::default(),
+            state: LibState::default(),
             items: items
                 .iter()
                 .map(|i| LibItem::new(i.clone(), LibKind::Title))
@@ -522,15 +677,10 @@ pub fn update_queue(data: &mut Data, client: &mut mpd::Client) {
     let current = client.currentsong().unwrap().unwrap_or(Song::default());
     let mut items = vec![];
     for song in queue {
-        items.push(LibItem::new(song.title.unwrap_or("".into()), LibKind::None))
+        items.push(LibItem::new(song.title.unwrap_or("".into()).clone(), LibKind::Title));
     }
     data.queue.items = items;
-    if data.queue.items.len() > 0 {
-        data.queue.items[current.place.unwrap_or(QueuePlace::default()).pos as usize].style =
-            Style::default()
-                .fg(Color::Rgb(45, 78, 32))
-                .bg(data.colors.background);
-    }
+    data.queue.state.set_playing(Some(current.place.unwrap_or(QueuePlace::default()).pos as usize));
 }
 
 pub struct Queue {
@@ -593,7 +743,7 @@ pub struct Settings {
 
 impl<'a> Settings {
     pub fn new() -> Settings {
-        let settings = vec![" Bluetooth", " Music", " Device", " Other", " Search"];
+        let settings = vec![" ➕ Add to Queue", " ➕ Add to Playlist", " 󰀉  View Artist", " 󰀥  View Album"];
         Settings {
             state: ListState::default(),
             items: settings.iter().map(|x| String::from(*x)).collect(),
@@ -618,6 +768,51 @@ impl<'a> Settings {
             Some(i) => {
                 if i == 0 {
                     self.items.len() - 1
+                } else {
+                    i - 1
+                }
+            }
+            None => 0,
+        };
+        self.state.select(Some(i));
+    }
+}
+
+pub struct Options {
+    pub items: Vec<LibItem>,
+    pub state: LibState,
+}
+
+impl Options {
+    pub fn new() -> Options {
+        let opt = vec![
+            LibItem::new("   Add to Queue".into(), LibKind::Option),
+            LibItem::new(" 󰟄  Add to Playlist".into(), LibKind::Option)
+        ];
+        Options {
+            items: opt,
+            state: LibState::default(),
+        }
+    }
+
+    pub fn next(&mut self) {
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i >= self.items.len() - 1 {
+                    i
+                } else {
+                    i + 1
+                }
+            }
+            None => 0,
+        };
+        self.state.select(Some(i));
+    }
+    pub fn previous(&mut self) {
+        let i = match self.state.selected() {
+            Some(i) => {
+                if i == 0 {
+                    0//self.items.len() - 1
                 } else {
                     i - 1
                 }

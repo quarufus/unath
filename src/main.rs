@@ -7,7 +7,7 @@ mod ui;
 
 use eve::{Event, Events};
 use library::{LibItem, LibKind};
-use libs::{update_queue, Data};
+use libs::{update_queue, Data, Library};
 
 use mpd::{song::Song, status, Client, Query, Term};
 use std::borrow::Cow::Borrowed;
@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             Err(_io) => Song::default(),
         };
 
-        if data.tabindex == 3 {
+        if data.tabindex == 2 {
             update_queue(&mut data, &mut client);
         }
 
@@ -51,7 +51,11 @@ fn main() -> Result<(), Box<dyn Error>> {
                     if data.options {
                         data.options = false
                     } else {
-                        data.options = true
+                        match data.selected().tag {
+                            LibKind::Title => data.options = true,
+                            LibKind::Album => data.options = true,
+                            _ => {}
+                        }
                     }
                 }
                 Key::Char('1') => data.tabindex = 0,
@@ -82,107 +86,122 @@ fn main() -> Result<(), Box<dyn Error>> {
                         client.play()?;
                     }
                 }
+                Key::Char(' ') => {
+                    let status = client.status()?;
+                    if status.state == status::State::Play {
+                        client.pause(true)?
+                    } else {
+                        client.play()?;
+                    }
+                }
                 Key::Char('u') => {
                     client.update().unwrap();
                     data.update(&mut client);
                 }
                 Key::Char('d') => {
-                    if data.tabindex == 3 {
+                    if data.tabindex == 2 {
                         client
-                            .delete(data.queue.state.selected().unwrap_or(0) as u32)
+                            .delete(
+                                data.queue.state.selected().unwrap_or(0) as u32
+                                    + (data.drained + 1) as u32,
+                            )
                             .unwrap_or(());
                         update_queue(&mut data, &mut client);
                         data.queue.select_last();
                     }
                 }
-                Key::Down => data.down(),
-                Key::Up => data.up(),
+                Key::Down => data.down(&mut client),
+                Key::Up => data.up(&mut client),
                 Key::Right => data.nexttab(),
                 Key::Left => data.prevtab(),
                 Key::Char('a') => data.library.add_to_queue(&data, &mut client),
                 Key::Char('.') => {
                     client.next()?;
                     client.pause(true)?;
-                    client.play()?
+                    client.play()?;
+                    update_queue(&mut data, &mut client);
                 }
                 Key::Char(',') => {
                     client.prev()?;
                     client.pause(true)?;
                     client.play()?
                 }
+                Key::Char('b') => {
+                    if data.tabindex == 1 {
+                        data.library = data.path.up()
+                    }
+                }
                 Key::Char('\n') => {
-                    let idx = data.library.state.selected().unwrap();
+                    let mut idx = data.library.state.selected().unwrap();
 
-                    if data.tabindex == 3 {
-                        client.switch(data.queue.state.selected().unwrap() as u32)?;
+                    if data.tabindex == 2 {
+                        client.switch(
+                            data.queue.state.selected().unwrap() as u32 + data.drained as u32,
+                        )?;
                         client.pause(true)?;
                         client.play()?;
                     }
-                    if data.tabindex == 1 {
-                        if data.library.items[idx].tag == LibKind::Artist {
-                            let pos = data.library.state.selected().unwrap();
-                            data.artists.state.select(Some(pos));
-                            let item = data.library.get_albums(&mut client);
-                            data.albums.items.clear();
-                            data.library.state.select(Some(0));
-                            let mut temp = vec![
-                                LibItem::new("  [Back]".into(), LibKind::Back),
-                                LibItem::new(
-                                    data.library.items[pos].content.clone().into(),
-                                    LibKind::Artist,
-                                ),
-                            ];
-                            data.albums.items.append(&mut temp);
-                            for (i, album) in item.items.iter().enumerate() {
-                                data.albums.items.insert(
-                                    i + 2,
-                                    LibItem::new(album.content.clone(), LibKind::Album),
-                                );
-                                data.library = data.albums.clone();
-                            }
-                        } else if data.library.items[idx].tag == LibKind::Album {
-                            let pos = data.library.state.selected().unwrap();
-                            data.albums.state.select(Some(pos));
-                            let item = data.library.get_titles(&mut client);
-                            data.titles.items.clear();
-                            data.library.state.select(Some(0));
-                            let mut temp = vec![
-                                LibItem::new("  [Back]".into(), LibKind::Back),
-                                LibItem::new(
-                                    data.library.items[pos].content.clone().into(),
-                                    LibKind::Album,
-                                ),
-                            ];
-                            data.titles.items.append(&mut temp);
-                            for (i, album) in item.items.iter().enumerate() {
-                                data.titles.items.insert(
-                                    i + 2,
-                                    LibItem::new(album.content.clone(), LibKind::Title),
-                                );
-                            }
-                            data.library = data.titles.clone();
-                        } else if data.library.items[idx].tag == LibKind::Title {
-                            client
-                                .findadd(&Query::new().and(
-                                    Term::Tag(Borrowed("Title")),
-                                    Borrowed(data.library.items[idx].content.as_str()),
-                                ))
-                                .unwrap();
-                            update_queue(&mut data, &mut client);
-                            client.switch(data.queue.items.len() as u32 - 1)?;
-                            client.pause(true)?;
-                            client.play()?;
-                        } else if data.library.items[idx].tag == LibKind::Back {
-                            match data.library.items[idx + 1].tag {
-                                LibKind::Artist => {
-                                    data.library = data.artists.clone();
-                                    data.albums.state.select(Some(0))
-                                }
-                                LibKind::Album => data.library = data.albums.clone(),
+                    if data.tabindex == 1 && !data.options {
+                        idx = data.library.state.selected().unwrap();
+                        match data.library.items[idx].tag {
+                            LibKind::Home => match data.library.state.selected().unwrap_or(0) {
+                                0 => data.library = data.playlists.clone(),
+                                1 => data.library = data.artists.clone(),
+                                2 => data.library = data.library.get_albums(&mut client),
+                                3 => data.library = data.titles.clone(),
                                 _ => {}
+                            },
+                            LibKind::Artist => {
+                                let albums: Library = data.library.get_albums(&mut client);
+                                data.albums = albums.clone();
+                                data.library = albums.clone();
+                                data.path.update(albums);
                             }
-                        };
+                            LibKind::Album => {
+                                let titles = data.library.get_titles(&mut client);
+                                data.path.update(titles.clone());
+                                data.library = titles.clone();
+                                //data.path.update(titles);
+                            }
+                            LibKind::Title => {
+                                client.clear()?;
+                                client
+                                    .findadd(&Query::new().and(
+                                        Term::Tag(Borrowed("Title")),
+                                        Borrowed(data.library.items[idx].content.as_str()),
+                                    ))
+                                    .unwrap();
+                                update_queue(&mut data, &mut client);
+                                //client.switch(data.queue.items.len() as u32 + (data.drained + 1) as u32)?;
+                                //client.pause(true)?;
+                                client.play()?;
+                            }
+                            LibKind::Playlist => {
+                                let p_list = client.playlist("Dance")?;
+                                //data.library = 0;
+                                for play in p_list {
+                                    data.library.push(LibItem::new(
+                                        play.title.unwrap_or("".into()),
+                                        LibKind::Title,
+                                    ))
+                                }
+                            }
+                            LibKind::Option => match data.library.state.selected().unwrap_or(0) {
+                                0 => data.library.add_to_queue(&data, &mut client),
+                                1 => {}
+                                _ => {}
+                            },
+                            _ => {}
+                        }
                     };
+                    if data.options {
+                        match data.opts.state.selected().unwrap_or(0) {
+                            0 => data.library.add_to_queue(&data, &mut client),
+                            1 => {}
+                            _ => {}
+                        }
+                        data.options = false;
+                    }
                 }
                 _ => {}
             }

@@ -1,0 +1,11 @@
+/home/rufus/Documents/unathplayer/target/debug/deps/unicode_segmentation-0251e74895a09da9.rmeta: /home/rufus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.8.0/src/lib.rs /home/rufus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.8.0/src/grapheme.rs /home/rufus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.8.0/src/tables.rs /home/rufus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.8.0/src/word.rs /home/rufus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.8.0/src/sentence.rs
+
+/home/rufus/Documents/unathplayer/target/debug/deps/libunicode_segmentation-0251e74895a09da9.rlib: /home/rufus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.8.0/src/lib.rs /home/rufus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.8.0/src/grapheme.rs /home/rufus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.8.0/src/tables.rs /home/rufus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.8.0/src/word.rs /home/rufus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.8.0/src/sentence.rs
+
+/home/rufus/Documents/unathplayer/target/debug/deps/unicode_segmentation-0251e74895a09da9.d: /home/rufus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.8.0/src/lib.rs /home/rufus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.8.0/src/grapheme.rs /home/rufus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.8.0/src/tables.rs /home/rufus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.8.0/src/word.rs /home/rufus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.8.0/src/sentence.rs
+
+/home/rufus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.8.0/src/lib.rs:
+/home/rufus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.8.0/src/grapheme.rs:
+/home/rufus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.8.0/src/tables.rs:
+/home/rufus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.8.0/src/word.rs:
+/home/rufus/.cargo/registry/src/github.com-1ecc6299db9ec823/unicode-segmentation-1.8.0/src/sentence.rs:

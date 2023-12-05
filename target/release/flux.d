@@ -1,0 +1,1 @@
+/home/rufus/Documents/unathplayer/target/release/flux: /home/rufus/Documents/unathplayer/src/eve.rs /home/rufus/Documents/unathplayer/src/library.rs /home/rufus/Documents/unathplayer/src/libs.rs /home/rufus/Documents/unathplayer/src/main.rs /home/rufus/Documents/unathplayer/src/position.rs /home/rufus/Documents/unathplayer/src/ui.rs
